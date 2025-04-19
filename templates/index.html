@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Violence Detection</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .light {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background-color: gray;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      transition: background-color 0.3s ease;
+    }
+
+    .blinking {
+      animation: blink 1s infinite alternate;
+    }
+
+    @keyframes blink {
+      from {
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
+      }
+
+      to {
+        box-shadow: 0 0 40px currentColor;
+      }
+    }
+  </style>
+</head>
+
+<body >
+ <!-- Include Navbar -->
+ {% include 'Navbar.html' %}
+
+<div class="bg-gray-100 flex justify-center items-center h-full">
+  
+  <div class="bg-white shadow-lg rounded-lg p-6 w-full max-w-4xl text-center">
+    <h2 class="text-2xl font-bold text-gray-700">Violence Detection System</h2>
+
+    <form action="/" method="post" enctype="multipart/form-data" class="mt-4">
+      <input type="file" name="file" accept="video/*" required
+        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border file:rounded-lg file:border-gray-300 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300" />
+      <button type="submit"
+        class="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+        Upload & Detect
+      </button>
+    </form>
+
+    {% if input_video %}
+    <div id="videoSection" class="mt-6 flex flex-col items-center h-96">
+      <h3 class="text-lg font-semibold text-gray-700">Uploaded Video:</h3>
+      <video class="    mt-2 rounded-lg border" controls id="uploadedVideo">
+        <source src="{{ input_video }}" type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+
+      <div class="flex justify-center space-x-12 mt-4">
+        <div class="flex flex-col items-center">
+          <div id="redLight" class="light"></div>
+        </div>
+        <div class="flex flex-col items-center">
+          <div id="greenLight" class="light"></div>
+        </div>
+      </div>
+
+      <p class="mt-6 text-xl font-bold text-gray-700" id="detectionLabel">{{ detection_label }}</p>
+
+      <button id="clearBtn" class="mt-4 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
+        Clear Video
+      </button>
+    </div>
+    {% endif %}
+</div>
+
+    <script>
+      const detectionResults = JSON.parse(`{{ detection_results | safe }}`);
+      const redLight = document.getElementById("redLight");
+      const greenLight = document.getElementById("greenLight");
+      const video = document.getElementById("uploadedVideo");
+      const clearBtn = document.getElementById("clearBtn");
+      const videoSection = document.getElementById("videoSection");
+
+
+      // Reset lights
+      function resetLights() {
+        redLight.style.backgroundColor = "gray";
+        greenLight.style.backgroundColor = "gray";
+        redLight.classList.remove("blinking");
+        greenLight.classList.remove("blinking");
+
+        const detectionLabel = document.getElementById("detectionLabel");
+        if (detectionLabel) {
+          detectionLabel.textContent = "";
+        }
+      }
+
+
+      function updateLights(label) {
+        const detectionLabel = document.getElementById("detectionLabel");
+
+        if (label === "Violence") {
+          redLight.style.backgroundColor = "red";
+          greenLight.style.backgroundColor = "gray";
+          redLight.classList.add("blinking");
+          greenLight.classList.remove("blinking");
+          detectionLabel.textContent = "Violence";
+        } else if (label === "Non-Violence") {
+          greenLight.style.backgroundColor = "green";
+          redLight.style.backgroundColor = "gray";
+          greenLight.classList.add("blinking");
+          redLight.classList.remove("blinking");
+          detectionLabel.textContent = "Non-Violence";
+        } else {
+          resetLights();
+          detectionLabel.textContent = "";
+        }
+      }
+
+
+
+      let animationFrameId;
+      let lastFrame = -1;
+      const fps = 25; // Make sure this matches your model's frame sampling
+
+      function syncLightsToVideo() {
+        if (video.paused || video.ended) {
+          cancelAnimationFrame(animationFrameId);
+          resetLights();
+          return;
+        }
+
+        const currentFrame = Math.floor(video.currentTime * fps);
+        if (currentFrame !== lastFrame) {
+          const label = detectionResults[currentFrame];
+          updateLights(label);
+          lastFrame = currentFrame;
+        }
+
+        animationFrameId = requestAnimationFrame(syncLightsToVideo);
+      }
+
+      if (video) {
+        video.addEventListener("play", () => {
+          syncLightsToVideo();
+        });
+
+        video.addEventListener("pause", () => {
+          cancelAnimationFrame(animationFrameId);
+          resetLights();
+        });
+
+        video.addEventListener("ended", () => {
+          cancelAnimationFrame(animationFrameId);
+          resetLights();
+        });
+      }
+
+      // Clear Button Logic
+      if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+          if (videoSection) {
+            videoSection.remove();
+          }
+
+          const fileInput = document.querySelector('input[type="file"]');
+          if (fileInput) {
+            fileInput.value = "";
+          }
+        });
+      }
+    </script>
+
+
+
+
+</body>
+
+</html>
