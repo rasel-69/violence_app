@@ -32,49 +32,53 @@
   </style>
 </head>
 
-<body >
- <!-- Include Navbar -->
- {% include 'Navbar.html' %}
+<body>
+  <!-- Include Navbar -->
+  {% include 'Navbar.html' %}
 
-<div class="bg-gray-100 flex justify-center items-center h-full">
-  
-  <div class="bg-white shadow-lg rounded-lg p-6 w-full max-w-4xl text-center">
-    <h2 class="text-2xl font-bold text-gray-700">Violence Detection System</h2>
+  <div class=" flex justify-center items-center h-full">
 
-    <form action="/" method="post" enctype="multipart/form-data" class="mt-4">
-      <input type="file" name="file" accept="video/*" required
-        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border file:rounded-lg file:border-gray-300 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300" />
-      <button type="submit"
-        class="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
-        Upload & Detect
-      </button>
-    </form>
+    <div class="bg-white shadow-lg rounded-lg p-6 w-full max-w-4xl text-center">
+      <h2 class="text-2xl font-bold text-gray-700">Violence Detection System</h2>
 
-    {% if input_video %}
-    <div id="videoSection" class="mt-6 flex flex-col items-center h-96">
-      <h3 class="text-lg font-semibold text-gray-700">Uploaded Video:</h3>
-      <video class="    mt-2 rounded-lg border" controls id="uploadedVideo">
-        <source src="{{ input_video }}" type="video/mp4" />
-        Your browser does not support the video tag.
-      </video>
+      <form action="/" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept="video/*" required
+          class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border file:rounded-lg file:border-gray-300 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300" />
+        <button type="submit"
+          class="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+          Upload & Detect
+        </button>
+      </form>
 
-      <div class="flex justify-center space-x-12 mt-4">
-        <div class="flex flex-col items-center">
-          <div id="redLight" class="light"></div>
+      {% if input_video %}
+      <div id="videoSection" class="mt-1 flex flex-col items-center h-96">
+        <h3 class="text-lg font-semibold text-gray-700">Uploaded Video:</h3>
+        <video class="  rounded-lg border" controls id="uploadedVideo">
+          <source src="{{ input_video }}" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+
+        <div class="flex justify-center space-x-12 mt-6">
+          <div class="flex flex-col items-center">
+            <div id="redLight" class="light flex items-center justify-center text-white font-bold text-lg">
+              <span id="redConfidence"></span>
+            </div>
+          </div>
+          <div class="flex flex-col items-center">
+            <div id="greenLight" class="light flex items-center justify-center text-white font-bold text-lg">
+              <span id="greenConfidence"></span>
+            </div>
+          </div>
         </div>
-        <div class="flex flex-col items-center">
-          <div id="greenLight" class="light"></div>
-        </div>
+
+     <p class="mt-1 text-xl font-bold text-gray-700" id="detectionLabel">{{ detection_label }}</p>
+
+        <button id="clearBtn" class="mt-4 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
+          Clear Video
+        </button>
       </div>
-
-      <p class="mt-6 text-xl font-bold text-gray-700" id="detectionLabel">{{ detection_label }}</p>
-
-      <button id="clearBtn" class="mt-4 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">
-        Clear Video
-      </button>
+      {% endif %}
     </div>
-    {% endif %}
-</div>
 
     <script>
       const detectionResults = JSON.parse(`{{ detection_results | safe }}`);
@@ -99,26 +103,40 @@
       }
 
 
-      function updateLights(label) {
+      function updateLights(label, confidence) {
         const detectionLabel = document.getElementById("detectionLabel");
+        const redConfidence = document.getElementById("redConfidence");
+        const greenConfidence = document.getElementById("greenConfidence");
 
         if (label === "Violence") {
           redLight.style.backgroundColor = "red";
           greenLight.style.backgroundColor = "gray";
+
           redLight.classList.add("blinking");
           greenLight.classList.remove("blinking");
+
+          redConfidence.textContent = confidence ? `${confidence.toFixed(1)}%` : "";
+          greenConfidence.textContent = "";
           detectionLabel.textContent = "Violence";
+          detectionLabel.style.color = "red";
         } else if (label === "Non-Violence") {
           greenLight.style.backgroundColor = "green";
           redLight.style.backgroundColor = "gray";
+
           greenLight.classList.add("blinking");
           redLight.classList.remove("blinking");
+
+          greenConfidence.textContent = confidence ? `${confidence.toFixed(1)}%` : "";
+          redConfidence.textContent = "";
           detectionLabel.textContent = "Non-Violence";
+          detectionLabel.style.color = "green";
         } else {
           resetLights();
           detectionLabel.textContent = "";
         }
       }
+
+console.log(greenConfidence)
 
 
 
@@ -135,10 +153,13 @@
 
         const currentFrame = Math.floor(video.currentTime * fps);
         if (currentFrame !== lastFrame) {
-          const label = detectionResults[currentFrame];
-          updateLights(label);
+          const result = detectionResults[currentFrame] || {};
+          const label = result?.label;
+          const confidence = result?.confidence;
+          updateLights(label, confidence);
           lastFrame = currentFrame;
         }
+
 
         animationFrameId = requestAnimationFrame(syncLightsToVideo);
       }
@@ -174,6 +195,36 @@
       }
     </script>
 
+
+
+
+    <script>
+      let userLatitude = null;
+      let userLongitude = null;
+
+      // Get user's current location
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function (position) {
+          userLatitude = position.coords.latitude;
+          userLongitude = position.coords.longitude;
+
+          // Add hidden inputs to the form
+          const form = document.querySelector("form");
+          const latInput = document.createElement("input");
+          latInput.type = "hidden";
+          latInput.name = "latitude";
+          latInput.value = userLatitude;
+
+          const lonInput = document.createElement("input");
+          lonInput.type = "hidden";
+          lonInput.name = "longitude";
+          lonInput.value = userLongitude;
+
+          form.appendChild(latInput);
+          form.appendChild(lonInput);
+        });
+      }
+    </script>
 
 
 
